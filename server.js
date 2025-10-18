@@ -9,7 +9,10 @@ const app = express();
 app.set("trust proxy", 1);
 
 // --- CORS sozlamalari ---
-const allowedOrigins = (process.env.FRONTEND_ORIGIN || "")
+// If FRONTEND_ORIGIN not set, allow local dev and the deployed Vercel frontend as fallback.
+const DEFAULT_FRONTEND_ORIGINS =
+  "http://localhost:5173,https://idokon-course.vercel.app";
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || DEFAULT_FRONTEND_ORIGINS)
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
@@ -51,49 +54,73 @@ app.get("/healthz", (req, res) => {
   });
 });
 
+// set defaults from env, fallback to provided values if env missing
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
 // --- Telegramga xabar yuborish ---
 app.post("/api/telegram-notify", async (req, res) => {
   try {
-    const { name = "", phone = "", score, total, percent, passed } = req.body || {};
+    const {
+      name = "",
+      phone = "",
+      score,
+      total,
+      percent,
+      passed,
+    } = req.body || {};
     if (typeof score !== "number" || typeof total !== "number") {
-      return res.status(400).json({ ok: false, error: "Invalid payload (score/total required)" });
+      return res
+        .status(400)
+        .json({ ok: false, error: "Invalid payload (score/total required)" });
     }
 
-    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-    const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
     if (!BOT_TOKEN || !CHAT_ID) {
-      return res
-        .status(500)
-        .json({ ok: false, error: "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID" });
+      return res.status(500).json({
+        ok: false,
+        error: "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID",
+      });
     }
 
     const esc = (s = "") =>
-      String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
-    const statusLine = passed ? "✅ Muvaffaqiyatli o‘tdi" : "⚠️ Qayta urinishi kerak";
+    const statusLine = passed
+      ? "✅ Muvaffaqiyatli o‘tdi"
+      : "⚠️ Qayta urinishi kerak";
     const text =
       `<b>IDOKON Quiz</b>\n` +
       `👤 <b>Ism:</b> ${esc(name)}\n` +
       `📱 <b>Tel:</b> ${esc(phone)}\n` +
       `🧮 <b>Natija:</b> ${score}/${total} (${
-        typeof percent === "number" ? percent : Math.round((score / total) * 100)
+        typeof percent === "number"
+          ? percent
+          : Math.round((score / total) * 100)
       }%)\n` +
       `📌 ${statusLine}`;
 
-    const tgResp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: CHAT_ID,
-        text,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-    });
+    const tgResp = await fetch(
+      `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: CHAT_ID,
+          text,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        }),
+      }
+    );
 
     if (!tgResp.ok) {
       const t = await tgResp.text();
-      return res.status(502).json({ ok: false, error: "Telegram API error", details: t });
+      return res
+        .status(502)
+        .json({ ok: false, error: "Telegram API error", details: t });
     }
 
     res.json({ ok: true });
@@ -108,7 +135,6 @@ app.post("/api/telegram-webhook", (req, res) => {
   res.sendStatus(200);
   (async () => {
     try {
-      const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
       if (!BOT_TOKEN) return;
 
       const message =
@@ -149,9 +175,8 @@ app.listen(PORT, () => {
 // === Oddiy foydalanuvchi uchun polling bot (START) ===
 // =====================================================
 
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-if (TOKEN) {
-  const bot = new TelegramBot(TOKEN, { polling: true });
+if (BOT_TOKEN) {
+  const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
   bot.onText(/\/start/i, (msg) => {
     const chatId = msg.chat.id;
