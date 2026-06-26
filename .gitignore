@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.supabase.example
 
 # builds
 dist/
@@ -15,5 +16,6 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
-# misc
-.DS_Store
+# Supabase
+.supabase/
+

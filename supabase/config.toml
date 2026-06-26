@@ -1,0 +1,20 @@
+# Supabase lokal va production sozlamalari
+# https://supabase.com/docs/guides/cli/config
+
+project_id = "idokon-course"
+
+[api]
+enabled = true
+port = 54321
+
+[functions]
+# Edge Functions umumiy sozlamalari
+
+[functions.telegram-notify]
+verify_jwt = false
+
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.healthz]
+verify_jwt = false
